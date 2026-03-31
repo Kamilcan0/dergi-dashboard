@@ -321,6 +321,11 @@ window.doFilterMags=function(){
 
 var _curMag=null;
 
+function magChartsLive(){
+  var a=CI['c_mbar'],b=CI['c_mline'];
+  return a&&b&&a.canvas&&b.canvas&&document.body.contains(a.canvas)&&document.body.contains(b.canvas);
+}
+
 window.closeMagDetail=function(){dc('c_mbar');dc('c_mline');_curMag=null;var p=document.getElementById('mDetail');if(p)p.innerHTML=''};
 
 window.showMag=function(name){
@@ -340,33 +345,45 @@ window.showMag=function(name){
     +'<button type="button" style="background:var(--bg2);border:1px solid var(--brd);color:var(--dim);border-radius:.35rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem" onclick="closeMagDetail()">\u2715</button></div>'
     +'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;flex-wrap:wrap">'
     +'<span style="font-size:.78rem;color:var(--dim);font-weight:500">Yıl Aralığı:</span>'
-    +'<select class="fs" id="mdYrStart" onchange="updateMagRange()" style="min-width:70px">'+yrOpts+'</select>'
+    +'<select class="fs" id="mdYrStart" onchange="onMagYearChange()" style="min-width:70px">'+yrOpts+'</select>'
     +'<span style="color:var(--dim);font-size:.8rem">\u2013</span>'
-    +'<select class="fs" id="mdYrEnd" onchange="updateMagRange()" style="min-width:70px">'+yrOpts+'</select>'
+    +'<select class="fs" id="mdYrEnd" onchange="onMagYearChange()" style="min-width:70px">'+yrOpts+'</select>'
     +'</div>'
     +'<div class="sr" id="mdStats"></div>'
     +'<div class="g2"><div class="cb" style="margin:0"><div class="ch"><div class="ct">Sevk & İade</div></div><canvas id="c_mbar" height="240"></canvas></div>'
     +'<div class="cb" style="margin:0"><div class="ch"><div class="ct">Başarı Oranı Trendi</div></div><canvas id="c_mline" height="240"></canvas></div></div></div>';
 
-  document.getElementById('mdYrEnd').value=allYrs[allYrs.length-1];
+  var ys=document.getElementById('mdYrStart'),ye=document.getElementById('mdYrEnd');
+  if(ys)ys.value=String(allYrs[0]);
+  if(ye)ye.value=String(allYrs[allYrs.length-1]);
 
   requestAnimationFrame(function(){
-    updateMagRange();
-    flushCharts();
-    panel.scrollIntoView({behavior:'smooth',block:'start'});
+    requestAnimationFrame(function(){
+      updateMagRange();
+      flushCharts();
+      panel.scrollIntoView({behavior:'smooth',block:'start'});
+    });
   });
+};
+
+window.onMagYearChange=function(){
+  requestAnimationFrame(function(){updateMagRange()});
 };
 
 window.updateMagRange=function(){
   var name=_curMag;
   var d=D.mags[name];if(!d)return;
+  var elS=document.getElementById('mdYrStart'),elE=document.getElementById('mdYrEnd');
+  if(!elS||!elE)return;
   var allYrs=Object.keys(d.y).map(Number).sort();
-  var y1=Number(document.getElementById('mdYrStart').value);
-  var y2=Number(document.getElementById('mdYrEnd').value);
-  if(y2<y1){y2=y1;document.getElementById('mdYrEnd').value=y2}
+  var y1=Number(elS.value),y2=Number(elE.value);
+  if(!isFinite(y1)||!isFinite(y2))return;
+  if(y2<y1){y2=y1;elE.value=String(y2)}
 
   var yrs=allYrs.filter(function(y){return y>=y1&&y<=y2});
   if(yrs.length===0)return;
+  var ep=document.getElementById('mdPeriod'),es=document.getElementById('mdStats');
+  if(!ep||!es)return;
 
   var nets=yrs.map(function(yr){return d.y[yr].n});
   var iades=yrs.map(function(yr){return d.y[yr].i});
@@ -383,9 +400,9 @@ window.updateMagRange=function(){
   var first=nets[0]||1,last=nets[nets.length-1]||0;
   var chg=Math.abs(first)>0?((last-first)/Math.abs(first)*100).toFixed(0):'0';
 
-  document.getElementById('mdPeriod').textContent=yrs[0]+' \u2013 '+yrs[yrs.length-1]+' dönemi ('+yrs.length+' yıl)';
+  ep.textContent=yrs[0]+' \u2013 '+yrs[yrs.length-1]+' dönemi ('+yrs.length+' yıl)';
 
-  document.getElementById('mdStats').innerHTML=
+  es.innerHTML=
     '<div class="sc"><div class="sl">Toplam Sevk</div><div class="sv" style="color:var(--accent3)">'+ff(tSevk)+'</div></div>'
     +'<div class="sc"><div class="sl">Toplam İade</div><div class="sv" style="color:var(--accent5)">'+ff(tIade)+'</div></div>'
     +'<div class="sc"><div class="sl">Net Sevk</div><div class="sv" style="color:var(--accent)">'+ff(tNet)+'</div></div>'
@@ -393,25 +410,35 @@ window.updateMagRange=function(){
     +'<div class="sc"><div class="sl">Zirve</div><div class="sv" style="color:var(--accent4)">'+ff(peak)+' <span style="font-size:.65rem;color:var(--dim)">('+peakYr+')</span></div></div>'
     +'<div class="sc"><div class="sl">Değişim</div><div class="sv"><span class="'+(Number(chg)>=0?'up':'dn')+'">'+chg+'%</span></div></div>';
 
-  var bcolors=bdata.map(function(v){if(!v)return'transparent';if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444'});
+  var bcolors=bdata.map(function(v){
+    if(v==null||typeof v!=='number'||!isFinite(v))return'transparent';
+    if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444';
+  });
 
-  if(CI['c_mbar']&&CI['c_mline']){
-    var cb=CI['c_mbar'],cl=CI['c_mline'];
-    cb.data.labels=yrs;
-    cb.data.datasets[0].data=nets;
-    cb.data.datasets[1].data=iades;
-    cb.update('none');
-    cl.data.labels=yrs;
-    cl.data.datasets[0].data=bdata;
-    cl.data.datasets[0].pointBackgroundColor=bcolors;
-    cl.update('none');
-    flushCharts();
-    return;
+  var needNew=!magChartsLive();
+  if(!needNew){
+    try{
+      var cb=CI['c_mbar'],cl=CI['c_mline'];
+      cb.data.labels=yrs.slice();
+      cb.data.datasets[0].data=nets.slice();
+      cb.data.datasets[1].data=iades.slice();
+      cl.data.labels=yrs.slice();
+      cl.data.datasets[0].data=bdata.slice();
+      cl.data.datasets[0].pointBackgroundColor=bcolors.slice();
+      if(cb.options&&cb.options.scales&&cb.options.scales.y){delete cb.options.scales.y.min;delete cb.options.scales.y.max}
+      cb.update();
+      cl.update();
+      flushCharts();
+      return;
+    }catch(err){
+      dc('c_mbar');dc('c_mline');
+    }
   }
 
   var barEl=document.getElementById('c_mbar');
   var lineEl=document.getElementById('c_mline');
   if(!barEl||!lineEl)return;
+  dc('c_mbar');dc('c_mline');
 
   CI['c_mbar']=new Chart(barEl,{
     type:'line',
