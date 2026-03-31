@@ -319,11 +319,14 @@ window.doFilterMags=function(){
   }).join('');
 };
 
-var _curMag=null;
+var _curMag=null,_magPaintGen=0;
 
-function magChartsLive(){
-  var a=CI['c_mbar'],b=CI['c_mline'];
-  return a&&b&&a.canvas&&b.canvas&&document.body.contains(a.canvas)&&document.body.contains(b.canvas);
+function magRow(d,yr){
+  if(!d||!d.y)return null;
+  var s=String(yr);
+  if(d.y[s]!=null)return d.y[s];
+  if(d.y[yr]!=null)return d.y[yr];
+  return null;
 }
 
 window.closeMagDetail=function(){dc('c_mbar');dc('c_mline');_curMag=null;var p=document.getElementById('mDetail');if(p)p.innerHTML=''};
@@ -366,80 +369,10 @@ window.showMag=function(name){
   });
 };
 
-window.onMagYearChange=function(){
-  requestAnimationFrame(function(){updateMagRange()});
-};
-
-window.updateMagRange=function(){
-  var name=_curMag;
-  var d=D.mags[name];if(!d)return;
-  var elS=document.getElementById('mdYrStart'),elE=document.getElementById('mdYrEnd');
-  if(!elS||!elE)return;
-  var allYrs=Object.keys(d.y).map(Number).sort();
-  var y1=Number(elS.value),y2=Number(elE.value);
-  if(!isFinite(y1)||!isFinite(y2))return;
-  if(y2<y1){y2=y1;elE.value=String(y2)}
-
-  var yrs=allYrs.filter(function(y){return y>=y1&&y<=y2});
-  if(yrs.length===0)return;
-  var ep=document.getElementById('mdPeriod'),es=document.getElementById('mdStats');
-  if(!ep||!es)return;
-
-  var nets=yrs.map(function(yr){return d.y[yr].n});
-  var iades=yrs.map(function(yr){return d.y[yr].i});
-  var sevks=yrs.map(function(yr){return d.y[yr].s});
-  var bdata=yrs.map(function(yr){var b=d.y[yr].b;return(typeof b==='number'&&isFinite(b))?b*100:null});
-
-  var tSevk=sevks.reduce(function(a,b){return a+(b||0)},0);
-  var tIade=iades.reduce(function(a,b){return a+(b||0)},0);
-  var tNet=nets.reduce(function(a,b){return a+(b||0)},0);
-  var avgBo=tSevk>0?tNet/tSevk:0;
-  var validNets=nets.filter(function(v){return v!=null&&isFinite(v)});
-  var peak=validNets.length?Math.max.apply(null,validNets):0;
-  var peakYr=yrs[nets.indexOf(peak)]||'-';
-  var first=nets[0]||1,last=nets[nets.length-1]||0;
-  var chg=Math.abs(first)>0?((last-first)/Math.abs(first)*100).toFixed(0):'0';
-
-  ep.textContent=yrs[0]+' \u2013 '+yrs[yrs.length-1]+' dönemi ('+yrs.length+' yıl)';
-
-  es.innerHTML=
-    '<div class="sc"><div class="sl">Toplam Sevk</div><div class="sv" style="color:var(--accent3)">'+ff(tSevk)+'</div></div>'
-    +'<div class="sc"><div class="sl">Toplam İade</div><div class="sv" style="color:var(--accent5)">'+ff(tIade)+'</div></div>'
-    +'<div class="sc"><div class="sl">Net Sevk</div><div class="sv" style="color:var(--accent)">'+ff(tNet)+'</div></div>'
-    +'<div class="sc"><div class="sl">Başarı</div><div class="sv"><span class="bd '+bc(avgBo)+'" style="font-size:.85rem">'+pct(avgBo)+'</span></div></div>'
-    +'<div class="sc"><div class="sl">Zirve</div><div class="sv" style="color:var(--accent4)">'+ff(peak)+' <span style="font-size:.65rem;color:var(--dim)">('+peakYr+')</span></div></div>'
-    +'<div class="sc"><div class="sl">Değişim</div><div class="sv"><span class="'+(Number(chg)>=0?'up':'dn')+'">'+chg+'%</span></div></div>';
-
-  var bcolors=bdata.map(function(v){
-    if(v==null||typeof v!=='number'||!isFinite(v))return'transparent';
-    if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444';
-  });
-
-  var needNew=!magChartsLive();
-  if(!needNew){
-    try{
-      var cb=CI['c_mbar'],cl=CI['c_mline'];
-      cb.data.labels=yrs.slice();
-      cb.data.datasets[0].data=nets.slice();
-      cb.data.datasets[1].data=iades.slice();
-      cl.data.labels=yrs.slice();
-      cl.data.datasets[0].data=bdata.slice();
-      cl.data.datasets[0].pointBackgroundColor=bcolors.slice();
-      if(cb.options&&cb.options.scales&&cb.options.scales.y){delete cb.options.scales.y.min;delete cb.options.scales.y.max}
-      cb.update();
-      cl.update();
-      flushCharts();
-      return;
-    }catch(err){
-      dc('c_mbar');dc('c_mline');
-    }
-  }
-
-  var barEl=document.getElementById('c_mbar');
-  var lineEl=document.getElementById('c_mline');
+function paintMagCharts(yrs,nets,iades,bdata,bcolors){
+  var barEl=document.getElementById('c_mbar'),lineEl=document.getElementById('c_mline');
   if(!barEl||!lineEl)return;
   dc('c_mbar');dc('c_mline');
-
   CI['c_mbar']=new Chart(barEl,{
     type:'line',
     data:{labels:yrs,datasets:[
@@ -478,6 +411,81 @@ window.updateMagRange=function(){
     }
   });
   flushCharts();
+}
+
+function scheduleMagCharts(yrs,nets,iades,bdata,bcolors,attempt,gen){
+  if(gen!==_magPaintGen)return;
+  attempt=attempt||0;
+  var barEl=document.getElementById('c_mbar'),lineEl=document.getElementById('c_mline');
+  if(!barEl||!lineEl){
+    if(attempt<24)setTimeout(function(){scheduleMagCharts(yrs,nets,iades,bdata,bcolors,attempt+1,gen)},45);
+    return;
+  }
+  var r=barEl.getBoundingClientRect();
+  if((r.width<8||r.height<8)&&attempt<24){
+    setTimeout(function(){scheduleMagCharts(yrs,nets,iades,bdata,bcolors,attempt+1,gen)},45);
+    return;
+  }
+  if(gen!==_magPaintGen)return;
+  paintMagCharts(yrs,nets,iades,bdata,bcolors);
+}
+
+window.onMagYearChange=function(){
+  requestAnimationFrame(function(){updateMagRange()});
+};
+
+window.updateMagRange=function(){
+  var name=_curMag;
+  var d=D.mags[name];if(!d)return;
+  _magPaintGen++;
+  var gen=_magPaintGen;
+  var elS=document.getElementById('mdYrStart'),elE=document.getElementById('mdYrEnd');
+  if(!elS||!elE)return;
+  var allYrs=Object.keys(d.y).map(Number).sort();
+  var y1=Number(elS.value),y2=Number(elE.value);
+  if(!isFinite(y1)||!isFinite(y2))return;
+  if(y2<y1){y2=y1;elE.value=String(y2)}
+
+  var yrs=allYrs.filter(function(y){return y>=y1&&y<=y2&&magRow(d,y)});
+  if(yrs.length===0)return;
+  var ep=document.getElementById('mdPeriod'),es=document.getElementById('mdStats');
+  if(!ep||!es)return;
+
+  var nets=[],iades=[],sevks=[],bdata=[];
+  for(var ix=0;ix<yrs.length;ix++){
+    var row=magRow(d,yrs[ix]);
+    if(!row)continue;
+    nets.push(row.n);iades.push(row.i);sevks.push(row.s);
+    var b=row.b;bdata.push((typeof b==='number'&&isFinite(b))?b*100:null);
+  }
+  if(!nets.length)return;
+
+  var tSevk=sevks.reduce(function(a,b){return a+(b||0)},0);
+  var tIade=iades.reduce(function(a,b){return a+(b||0)},0);
+  var tNet=nets.reduce(function(a,b){return a+(b||0)},0);
+  var avgBo=tSevk>0?tNet/tSevk:0;
+  var validNets=nets.filter(function(v){return v!=null&&isFinite(v)});
+  var peak=validNets.length?Math.max.apply(null,validNets):0;
+  var peakYr=yrs[nets.indexOf(peak)]||'-';
+  var first=nets[0]||1,last=nets[nets.length-1]||0;
+  var chg=Math.abs(first)>0?((last-first)/Math.abs(first)*100).toFixed(0):'0';
+
+  ep.textContent=yrs[0]+' \u2013 '+yrs[yrs.length-1]+' dönemi ('+yrs.length+' yıl)';
+
+  es.innerHTML=
+    '<div class="sc"><div class="sl">Toplam Sevk</div><div class="sv" style="color:var(--accent3)">'+ff(tSevk)+'</div></div>'
+    +'<div class="sc"><div class="sl">Toplam İade</div><div class="sv" style="color:var(--accent5)">'+ff(tIade)+'</div></div>'
+    +'<div class="sc"><div class="sl">Net Sevk</div><div class="sv" style="color:var(--accent)">'+ff(tNet)+'</div></div>'
+    +'<div class="sc"><div class="sl">Başarı</div><div class="sv"><span class="bd '+bc(avgBo)+'" style="font-size:.85rem">'+pct(avgBo)+'</span></div></div>'
+    +'<div class="sc"><div class="sl">Zirve</div><div class="sv" style="color:var(--accent4)">'+ff(peak)+' <span style="font-size:.65rem;color:var(--dim)">('+peakYr+')</span></div></div>'
+    +'<div class="sc"><div class="sl">Değişim</div><div class="sv"><span class="'+(Number(chg)>=0?'up':'dn')+'">'+chg+'%</span></div></div>';
+
+  var bcolors=bdata.map(function(v){
+    if(v==null||typeof v!=='number'||!isFinite(v))return'transparent';
+    if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444';
+  });
+
+  scheduleMagCharts(yrs,nets,iades,bdata,bcolors,0,gen);
 };
 
 // ══════ COMPARE ══════
