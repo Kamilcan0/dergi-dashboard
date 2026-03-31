@@ -132,12 +132,12 @@ function spark(vals,w,h,col){
 
 // ── Navigation ──
 var tabs=[
-  {id:'trends',icon:'\u{1F4C8}',label:'Ulusal Trendler'},
   {id:'magazines',icon:'\u{1F4D6}',label:'Dergi Detayları'},
+  {id:'trends',icon:'\u{1F4C8}',label:'Ulusal Trendler'},
   {id:'compare',icon:'\u2696',label:'Karşılaştırma'},
   {id:'table',icon:'\u{1F4CB}',label:'Veri Tablosu'}
 ];
-var curTab='trends';
+var curTab='magazines';
 
 function renderNav(){
   document.getElementById('nav').innerHTML=tabs.map(function(t){
@@ -152,8 +152,8 @@ function renderPage(){
   Object.keys(CI).forEach(function(k){dc(k)});
   var el=document.getElementById('app');
   switch(curTab){
-    case'trends':el.innerHTML=buildTrends();initTrendCharts();break;
     case'magazines':el.innerHTML=buildMagazines();doFilterMags();break;
+    case'trends':el.innerHTML=buildTrends();initTrendCharts();break;
     case'compare':el.innerHTML=buildCompare();initCompare();break;
     case'table':el.innerHTML=buildTable();doFilterTable();break;
   }
