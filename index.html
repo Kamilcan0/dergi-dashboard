@@ -134,7 +134,6 @@ function spark(vals,w,h,col){
 var tabs=[
   {id:'overview',icon:'\u{1F4CA}',label:'Genel Bakış'},
   {id:'trends',icon:'\u{1F4C8}',label:'Ulusal Trendler'},
-  {id:'sector',icon:'\u{1F3AF}',label:'Sektör Analizi'},
   {id:'magazines',icon:'\u{1F4D6}',label:'Dergi Detayları'},
   {id:'compare',icon:'\u2696',label:'Karşılaştırma'},
   {id:'table',icon:'\u{1F4CB}',label:'Veri Tablosu'}
@@ -156,7 +155,6 @@ function renderPage(){
   switch(curTab){
     case'overview':el.innerHTML=buildOverview();initOverviewCharts();break;
     case'trends':el.innerHTML=buildTrends();initTrendCharts();break;
-    case'sector':el.innerHTML=buildSector();initSectorCharts();break;
     case'magazines':el.innerHTML=buildMagazines();doFilterMags();break;
     case'compare':el.innerHTML=buildCompare();initCompare();break;
     case'table':el.innerHTML=buildTable();doFilterTable();break;
@@ -364,81 +362,6 @@ function initTrendCharts(){
   });
   h+='</tbody></table>';
   document.getElementById('matrixDiv').innerHTML=h;
-}
-
-// ══════ SECTOR ══════
-var secType='line',secYear=5;
-var CATS=[
-  {k:'sh',l:'Siyasi/Haber',c:'#ef4444'},
-  {k:'sm',l:'Sektörel/Mesleki',c:'#f59e0b'},
-  {k:'kt',l:'Kültür/Turizm',c:'#8b5cf6'},
-  {k:'ef',l:'Ekonomi/Finans',c:'#06b6d4'},
-  {k:'dg',l:'Diğerleri (Hobi/Bilim/Yaşam)',c:'#10b981'}
-];
-
-function buildSector(){
-  return '<div class="cb"><div class="ch"><div class="ct">\u{1F4CA} Kategori Pazar Payları (2019-2027)</div>'
-    +'<div class="ca"><button class="cbtn on" id="slBtn" onclick="secType=\'line\';initSectorCharts()">Çizgi</button>'
-    +'<button class="cbtn" id="saBtn" onclick="secType=\'area\';initSectorCharts()">Alan</button>'
-    +'<button class="cbtn" id="ssBtn" onclick="secType=\'stack\';initSectorCharts()">Yığılmış</button></div>'
-    +'</div><canvas id="c_sector" height="95"></canvas></div>'
-    +'<div class="cb"><div class="ch"><div class="ct">Yıl Bazında Pazar Payı</div><div class="yp" id="ypDiv"></div></div>'
-    +'<div class="g2" style="align-items:center"><canvas id="c_spie"></canvas><div id="spieInfo"></div></div></div>'
-    +'<div class="ib"><div class="it">\u{1F4CA} Sektörel Dönüşüm</div>"Diğerleri" kategorisi 2019\'da <b>%61,9</b>\'dan 2027\'de <b>%98,2</b>\'ye yükseliyor. Siyasi/Haber <b>%8,5</b>\'ten <b>%0,67</b>\'ye iniyor.</div>';
-}
-
-function initSectorCharts(){
-  var s=D.sector,yrs=s.map(function(d){return d.y});
-  var isStk=secType==='stack',isA=secType==='area'||isStk;
-  document.getElementById('slBtn').className='cbtn'+(secType==='line'?' on':'');
-  document.getElementById('saBtn').className='cbtn'+(secType==='area'?' on':'');
-  document.getElementById('ssBtn').className='cbtn'+(secType==='stack'?' on':'');
-
-  dc('c_sector');
-  CI['c_sector']=new Chart(document.getElementById('c_sector'),{
-    type:'line',
-    data:{labels:yrs,datasets:CATS.map(function(cat){
-      return{label:cat.l,data:s.map(function(d){return(d[cat.k]||0)*100}),
-        borderColor:cat.c,backgroundColor:cat.c+(isA?'30':'08'),
-        fill:isStk?'origin':isA,stack:isStk?'s0':undefined,
-        tension:.35,pointRadius:isStk?0:5,pointHoverRadius:7,borderWidth:isStk?1:2.5}
-    })},
-    options:{responsive:true,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{labels:{color:'#94a3b8',usePointStyle:true,padding:10}},
-        tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.dataset.label+': %'+ctx.raw.toFixed(2)}}},
-        datalabels:{display:false}},
-      scales:{x:{ticks:{color:'#7a8baa'},grid:{color:'rgba(30,45,74,.3)'}},
-        y:{stacked:isStk,ticks:{color:'#7a8baa',callback:function(v){return'%'+v}},grid:{color:'rgba(30,45,74,.3)'},max:isStk?100:undefined}}
-    },plugins:[ChartDataLabels]
-  });
-
-  // Year pills
-  var yh=yrs.map(function(y,i){
-    return'<button class="yb'+(i>=6?' fc':'')+(i===secYear?' on':'')+'" onclick="secYear='+i+';initSectorCharts()">'+y+'</button>';
-  }).join('');
-  document.getElementById('ypDiv').innerHTML=yh;
-
-  // Pie
-  var d=s[secYear];
-  dc('c_spie');
-  CI['c_spie']=new Chart(document.getElementById('c_spie'),{
-    type:'doughnut',
-    data:{labels:CATS.map(function(c){return c.l}),datasets:[{
-      data:CATS.map(function(c){return(d[c.k]||0)*100}),
-      backgroundColor:CATS.map(function(c){return c.c}),
-      borderColor:'#151d30',borderWidth:2,hoverOffset:8
-    }]},
-    options:{responsive:true,cutout:'50%',plugins:{
-      legend:{display:false},
-      tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.label+': %'+ctx.raw.toFixed(2)}}},
-      datalabels:{display:false}
-    }},plugins:[ChartDataLabels]
-  });
-
-  document.getElementById('spieInfo').innerHTML='<div style="padding:.5rem"><h4 style="margin-bottom:.6rem;color:var(--dim);font-size:.85rem">'+d.y+' Pazar Payları</h4>'
-    +CATS.map(function(c){var val=(d[c.k]||0)*100;
-      return'<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0"><span style="width:9px;height:9px;border-radius:50%;background:'+c.c+';flex-shrink:0"></span><span style="flex:1;font-size:.82rem">'+c.l+'</span><b style="color:'+c.c+';font-size:.85rem">%'+val.toFixed(2)+'</b></div>'
-    }).join('')+'</div>';
 }
 
 // ══════ MAGAZINES ══════
