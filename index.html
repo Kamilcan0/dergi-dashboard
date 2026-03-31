@@ -190,9 +190,9 @@ function buildTrends(){
     +'<div class="kc"><div class="ki" style="background:rgba(239,68,68,.12)">\u26A0</div><div class="kl">2027 Tahmini</div><div class="kv" style="color:var(--bad)">'+fmt(p27)+'</div><div class="ks"><span class="dn">'+c27+'%</span> 2019\'a göre</div></div>'
     +'<div class="kc"><div class="ki" style="background:rgba(139,92,246,.12)">\u{1F4C8}</div><div class="kl">Trend</div><div class="kv" style="font-size:.95rem;color:var(--dim)">Sürekli Düşüş</div><div class="ks">'+spark(sv,100,24,'#ef4444')+'</div></div>'
     +'</div>'
-    +'<div class="cb"><div class="ch"><div class="ct">\u{1F4C9} Türkiye Geneli Dergi Üretim Trendi (TÜİK)</div></div><canvas id="c_trend" height="260"></canvas></div>'
+    +'<div class="cb"><div class="ch"><div class="ct">\u{1F4C9} Türkiye Geneli Dergi Üretim Trendi (TÜİK)</div></div><canvas id="c_trend" height="200"></canvas></div>'
     +'<div class="g2">'
-    +'<div class="cb"><div class="ch"><div class="ct">Yıllık Değişim Oranı</div></div><canvas id="c_chg" height="220"></canvas></div>'
+    +'<div class="cb"><div class="ch"><div class="ct">Yıllık Değişim Oranı</div></div><canvas id="c_chg" height="170"></canvas></div>'
     +'<div class="cb"><div class="ch"><div class="ct">Üretim Oran Matrisi</div></div><div class="mw" id="matrixDiv"></div></div>'
     +'</div>';
 }
@@ -353,8 +353,8 @@ window.showMag=function(name){
     +'<select class="fs" id="mdYrEnd" onchange="onMagYearChange()" style="min-width:70px">'+yrOpts+'</select>'
     +'</div>'
     +'<div class="sr" id="mdStats"></div>'
-    +'<div class="g2"><div class="cb" style="margin:0"><div class="ch"><div class="ct">Sevk & İade</div></div><canvas id="c_mbar" height="240"></canvas></div>'
-    +'<div class="cb" style="margin:0"><div class="ch"><div class="ct">Başarı Oranı Trendi</div></div><canvas id="c_mline" height="240"></canvas></div></div></div>';
+    +'<div class="g2"><div class="cb" style="margin:0"><div class="ch"><div class="ct">Sevk & İade</div></div><canvas id="c_mbar" height="180"></canvas></div>'
+    +'<div class="cb" style="margin:0"><div class="ch"><div class="ct">Başarı Oranı Trendi</div></div><canvas id="c_mline" height="180"></canvas></div></div></div>';
 
   var ys=document.getElementById('mdYrStart'),ye=document.getElementById('mdYrEnd');
   if(ys)ys.value=String(allYrs[0]);
@@ -507,8 +507,8 @@ function buildCompare(){
     +'<button class="mb" data-m="iade" onclick="setCmpM(\'iade\')">İade</button>'
     +'<button class="mb" data-m="basari" onclick="setCmpM(\'basari\')">Başarı %</button>'
     +'</div></div></div>'
-    +'<div class="g2"><div class="cb"><div class="ch"><div class="ct" id="cmpTitle">Net Sevk Karşılaştırma</div></div><canvas id="c_cmpMain" height="280"></canvas></div>'
-    +'<div class="cb"><div class="ch"><div class="ct">Toplam Özet</div></div><canvas id="c_cmpBar" height="220"></canvas></div></div>'
+    +'<div class="g2"><div class="cb"><div class="ch"><div class="ct" id="cmpTitle">Net Sevk Karşılaştırma</div></div><canvas id="c_cmpMain" height="210"></canvas></div>'
+    +'<div class="cb"><div class="ch"><div class="ct">Toplam Özet</div></div><canvas id="c_cmpBar" height="170"></canvas></div></div>'
     +'<div class="cb"><div class="ch"><div class="ct">Yıl Bazlı Detay</div></div><div style="overflow-x:auto" id="cmpTbl"></div></div>';
 }
 
