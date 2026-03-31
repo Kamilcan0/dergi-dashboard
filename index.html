@@ -379,79 +379,118 @@ window.doFilterMags=function(){
   }).join('');
 };
 
+var _curMag=null;
+
 window.showMag=function(name){
   var d=D.mags[name];if(!d)return;
+  _curMag=name;
+  var allYrs=Object.keys(d.y).map(Number).sort();
   var panel=document.getElementById('mDetail');
-  var yrs=Object.keys(d.y).map(Number).sort();
-  var nets=yrs.map(function(yr){return d.y[yr].n});
-  var iades=yrs.map(function(yr){return d.y[yr].i});
-  var bdata=yrs.map(function(yr){var b=d.y[yr].b;return(typeof b==='number'&&isFinite(b))?b*100:null});
-  var peak=Math.max.apply(null,nets.filter(function(v){return v!=null&&isFinite(v)}));
-  var peakYr=yrs[nets.indexOf(peak)];
-  var first=nets[0]||1,last=nets[nets.length-1]||0;
-  var chg=((last-first)/Math.abs(first)*100).toFixed(0);
 
   dc('c_mbar');
   dc('c_mline');
 
+  var yrOpts=allYrs.map(function(y){return'<option value="'+y+'">'+y+'</option>'}).join('');
+
   panel.innerHTML='<div class="dp" style="margin-top:.75rem">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">'
-    +'<div><div style="font-size:1.2rem;font-weight:700">'+name+'</div><div style="color:var(--dim);font-size:.78rem;margin-top:.15rem">'+yrs[0]+' – '+yrs[yrs.length-1]+' dönemi</div></div>'
+    +'<div><div style="font-size:1.2rem;font-weight:700">'+name+'</div><div style="color:var(--dim);font-size:.78rem;margin-top:.15rem" id="mdPeriod">'+allYrs[0]+' \u2013 '+allYrs[allYrs.length-1]+' dönemi</div></div>'
     +'<button style="background:var(--bg2);border:1px solid var(--brd);color:var(--dim);border-radius:.35rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem" onclick="document.getElementById(\'mDetail\').innerHTML=\'\'">\u2715</button></div>'
-    +'<div class="sr">'
-    +'<div class="sc"><div class="sl">Toplam Sevk</div><div class="sv" style="color:var(--accent3)">'+ff(d.ts)+'</div></div>'
-    +'<div class="sc"><div class="sl">Toplam İade</div><div class="sv" style="color:var(--accent5)">'+ff(d.ti)+'</div></div>'
-    +'<div class="sc"><div class="sl">Net Sevk</div><div class="sv" style="color:var(--accent)">'+ff(d.tn)+'</div></div>'
-    +'<div class="sc"><div class="sl">Başarı</div><div class="sv"><span class="bd '+bc(d.bo)+'" style="font-size:.85rem">'+pct(d.bo)+'</span></div></div>'
-    +'<div class="sc"><div class="sl">Zirve</div><div class="sv" style="color:var(--accent4)">'+ff(peak)+' <span style="font-size:.65rem;color:var(--dim)">('+peakYr+')</span></div></div>'
-    +'<div class="sc"><div class="sl">Değişim</div><div class="sv"><span class="'+(Number(chg)>=0?'up':'dn')+'">'+chg+'%</span></div></div>'
+    +'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;flex-wrap:wrap">'
+    +'<span style="font-size:.78rem;color:var(--dim);font-weight:500">Yıl Aralığı:</span>'
+    +'<select class="fs" id="mdYrStart" onchange="updateMagRange()" style="min-width:70px">'+yrOpts+'</select>'
+    +'<span style="color:var(--dim);font-size:.8rem">\u2013</span>'
+    +'<select class="fs" id="mdYrEnd" onchange="updateMagRange()" style="min-width:70px">'+yrOpts+'</select>'
     +'</div>'
+    +'<div class="sr" id="mdStats"></div>'
     +'<div class="g2"><div class="cb" style="margin:0"><div class="ch"><div class="ct">Sevk & İade</div></div><canvas id="c_mbar"></canvas></div>'
     +'<div class="cb" style="margin:0"><div class="ch"><div class="ct">Başarı Oranı Trendi</div></div><canvas id="c_mline"></canvas></div></div></div>';
 
+  document.getElementById('mdYrEnd').value=allYrs[allYrs.length-1];
+
   requestAnimationFrame(function(){
-    var barEl=document.getElementById('c_mbar');
-    var lineEl=document.getElementById('c_mline');
-    if(!barEl||!lineEl)return;
-
-    CI['c_mbar']=new Chart(barEl,{
-      type:'bar',
-      data:{labels:yrs,datasets:[
-        {label:'Net Sevk',data:nets,backgroundColor:'rgba(59,130,246,.7)',borderRadius:4},
-        {label:'İade',data:iades,backgroundColor:'rgba(239,68,68,.45)',borderRadius:{topLeft:4,topRight:4}}
-      ]},
-      options:{responsive:true,
-        plugins:{legend:{labels:{color:'#94a3b8',usePointStyle:true}},
-          tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.dataset.label+': '+ff(ctx.raw)}}},
-          datalabels:{display:function(ctx){return ctx.datasetIndex===0},color:'#94a3b8',anchor:'end',align:'top',offset:3,font:{size:9,weight:'600'},formatter:function(v){return fmt(v)}}
-        },
-        scales:{x:{stacked:true,ticks:{color:'#7a8baa'},grid:{display:false}},y:{stacked:true,ticks:{color:'#7a8baa',callback:function(v){return fmt(v)}},grid:{color:'rgba(30,45,74,.3)'}}}
-      },plugins:[ChartDataLabels]
-    });
-
-    CI['c_mline']=new Chart(lineEl,{
-      type:'line',
-      data:{labels:yrs,datasets:[{
-        label:'Başarı %',data:bdata,borderColor:'#10b981',
-        backgroundColor:'rgba(16,185,129,.08)',fill:true,tension:.35,
-        pointRadius:5,pointHoverRadius:8,
-        pointBackgroundColor:bdata.map(function(v){if(!v)return'transparent';if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444'}),
-        pointBorderColor:'#10b981',pointBorderWidth:2,borderWidth:2.5
-      }]},
-      options:{responsive:true,
-        plugins:{legend:{display:false},
-          tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.raw?'%'+ctx.raw.toFixed(1):'-'}}},
-          datalabels:{
-            color:function(ctx){var v=dv(ctx);if(!v)return'transparent';if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444'},
-            anchor:'end',align:'top',offset:5,font:{size:9,weight:'700'},
-            formatter:function(v){return v?'%'+v.toFixed(1):''}
-          }
-        },
-        scales:{x:{ticks:{color:'#7a8baa'},grid:{color:'rgba(30,45,74,.2)'}},y:{min:0,max:100,ticks:{color:'#7a8baa',callback:function(v){return'%'+v},stepSize:25},grid:{color:'rgba(30,45,74,.3)'}}}
-      },plugins:[ChartDataLabels]
-    });
-
+    updateMagRange();
     panel.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+};
+
+window.updateMagRange=function(){
+  var name=_curMag;
+  var d=D.mags[name];if(!d)return;
+  var allYrs=Object.keys(d.y).map(Number).sort();
+  var y1=Number(document.getElementById('mdYrStart').value);
+  var y2=Number(document.getElementById('mdYrEnd').value);
+  if(y2<y1){y2=y1;document.getElementById('mdYrEnd').value=y2}
+
+  var yrs=allYrs.filter(function(y){return y>=y1&&y<=y2});
+  if(yrs.length===0)return;
+
+  var nets=yrs.map(function(yr){return d.y[yr].n});
+  var iades=yrs.map(function(yr){return d.y[yr].i});
+  var sevks=yrs.map(function(yr){return d.y[yr].s});
+  var bdata=yrs.map(function(yr){var b=d.y[yr].b;return(typeof b==='number'&&isFinite(b))?b*100:null});
+
+  var tSevk=sevks.reduce(function(a,b){return a+(b||0)},0);
+  var tIade=iades.reduce(function(a,b){return a+(b||0)},0);
+  var tNet=nets.reduce(function(a,b){return a+(b||0)},0);
+  var avgBo=tSevk>0?tNet/tSevk:0;
+  var validNets=nets.filter(function(v){return v!=null&&isFinite(v)});
+  var peak=validNets.length?Math.max.apply(null,validNets):0;
+  var peakYr=yrs[nets.indexOf(peak)]||'-';
+  var first=nets[0]||1,last=nets[nets.length-1]||0;
+  var chg=Math.abs(first)>0?((last-first)/Math.abs(first)*100).toFixed(0):'0';
+
+  document.getElementById('mdPeriod').textContent=yrs[0]+' \u2013 '+yrs[yrs.length-1]+' dönemi ('+yrs.length+' yıl)';
+
+  document.getElementById('mdStats').innerHTML=
+    '<div class="sc"><div class="sl">Toplam Sevk</div><div class="sv" style="color:var(--accent3)">'+ff(tSevk)+'</div></div>'
+    +'<div class="sc"><div class="sl">Toplam İade</div><div class="sv" style="color:var(--accent5)">'+ff(tIade)+'</div></div>'
+    +'<div class="sc"><div class="sl">Net Sevk</div><div class="sv" style="color:var(--accent)">'+ff(tNet)+'</div></div>'
+    +'<div class="sc"><div class="sl">Başarı</div><div class="sv"><span class="bd '+bc(avgBo)+'" style="font-size:.85rem">'+pct(avgBo)+'</span></div></div>'
+    +'<div class="sc"><div class="sl">Zirve</div><div class="sv" style="color:var(--accent4)">'+ff(peak)+' <span style="font-size:.65rem;color:var(--dim)">('+peakYr+')</span></div></div>'
+    +'<div class="sc"><div class="sl">Değişim</div><div class="sv"><span class="'+(Number(chg)>=0?'up':'dn')+'">'+chg+'%</span></div></div>';
+
+  dc('c_mbar');
+  dc('c_mline');
+  var barEl=document.getElementById('c_mbar');
+  var lineEl=document.getElementById('c_mline');
+  if(!barEl||!lineEl)return;
+
+  CI['c_mbar']=new Chart(barEl,{
+    type:'bar',
+    data:{labels:yrs,datasets:[
+      {label:'Net Sevk',data:nets,backgroundColor:'rgba(59,130,246,.7)',borderRadius:4},
+      {label:'İade',data:iades,backgroundColor:'rgba(239,68,68,.45)',borderRadius:{topLeft:4,topRight:4}}
+    ]},
+    options:{responsive:true,
+      plugins:{legend:{labels:{color:'#94a3b8',usePointStyle:true}},
+        tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.dataset.label+': '+ff(ctx.raw)}}},
+        datalabels:{display:function(ctx){return ctx.datasetIndex===0},color:'#94a3b8',anchor:'end',align:'top',offset:3,font:{size:9,weight:'600'},formatter:function(v){return fmt(v)}}
+      },
+      scales:{x:{stacked:true,ticks:{color:'#7a8baa'},grid:{display:false}},y:{stacked:true,ticks:{color:'#7a8baa',callback:function(v){return fmt(v)}},grid:{color:'rgba(30,45,74,.3)'}}}
+    },plugins:[ChartDataLabels]
+  });
+
+  CI['c_mline']=new Chart(lineEl,{
+    type:'line',
+    data:{labels:yrs,datasets:[{
+      label:'Başarı %',data:bdata,borderColor:'#10b981',
+      backgroundColor:'rgba(16,185,129,.08)',fill:true,tension:.35,
+      pointRadius:5,pointHoverRadius:8,
+      pointBackgroundColor:bdata.map(function(v){if(!v)return'transparent';if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444'}),
+      pointBorderColor:'#10b981',pointBorderWidth:2,borderWidth:2.5
+    }]},
+    options:{responsive:true,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'rgba(21,29,48,.95)',callbacks:{label:function(ctx){return ctx.raw?'%'+ctx.raw.toFixed(1):'-'}}},
+        datalabels:{
+          color:function(ctx){var v=dv(ctx);if(!v)return'transparent';if(v>=65)return'#22c55e';if(v>=50)return'#f59e0b';return'#ef4444'},
+          anchor:'end',align:'top',offset:5,font:{size:9,weight:'700'},
+          formatter:function(v){return v?'%'+v.toFixed(1):''}
+        }
+      },
+      scales:{x:{ticks:{color:'#7a8baa'},grid:{color:'rgba(30,45,74,.2)'}},y:{min:0,max:100,ticks:{color:'#7a8baa',callback:function(v){return'%'+v},stepSize:25},grid:{color:'rgba(30,45,74,.3)'}}}
+    },plugins:[ChartDataLabels]
   });
 };
 
